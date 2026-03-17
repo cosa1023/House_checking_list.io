@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>專業驗屋自驗紀錄表 - 完整項目版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        details[open] summary ~ * {
+            animation: sweep .3s ease-in-out;
+        }
+        @keyframes sweep {
+            0%    {opacity: 0; transform: translateY(-10px)}
+            100%  {opacity: 1; transform: translateY(0)}
+        }
+        .progress-bar {
+            transition: width 0.4s ease-in-out;
+        }
+        .status-btn.active-pass {
+            background-color: #22c55e;
+            color: white;
+            border-color: #16a34a;
+        }
+        .status-btn.active-fail {
+            background-color: #ef4444;
+            color: white;
+            border-color: #dc2626;
+        }
+        .row-fail textarea {
+            border-color: #fca5a5;
+            background-color: #fef2f2;
+        }
+        .item-link {
+            color: #2563eb;
+            text-decoration: underline;
+            text-underline-offset: 4px;
+            font-weight: 600;
+        }
+        .item-link:hover {
+            color: #1d4ed8;
+            background-color: #eff6ff;
+        }
+        summary::-webkit-details-marker { display: none; }
+        summary { list-style: none; }
+
+        @media print {
+            .no-print { display: none; }
+            details { border: 1px solid #ccc !important; margin-bottom: 10px !important; display: block !important; }
+            details summary { background: #f0f0f0 !important; }
+            .section-reset-btn { display: none !important; }
+            main { margin-top: 0 !important; }
+            .fixed { position: relative !important; }
+            .item-link { text-decoration: none; color: black; pointer-events: none; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen pb-20 font-sans text-slate-900">
+
+    <div class="fixed top-0 left-0 w-full bg-white shadow-lg z-50 border-b border-slate-200 no-print">
+        <div class="max-w-5xl mx-auto p-4">
+            <div class="flex justify-between items-center mb-2">
+                <h1 class="text-xl font-bold text-slate-800 tracking-tight">專業驗屋自驗紀錄表</h1>
+                <div class="flex gap-2">
+                    <button onclick="sendEmail()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-all shadow-md">完成並送出</button>
+                    <button onclick="window.print()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-all shadow-md">下載 PDF</button>
+                    <button onclick="resetAll()" class="text-xs text-slate-400 hover:text-red-500 underline ml-2">全部清空</button>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <div class="flex items-center gap-2"><label class="text-sm font-bold shrink-0">戶號:</label><input type="text" id="houseId" placeholder="例如: A棟12樓-1" class="w-full bg-white border rounded px-2 py-1 text-sm"></div>
+                <div class="flex items-center gap-2"><label class="text-sm font-bold shrink-0">驗屋:</label><select id="inspectCount" class="w-full bg-white border rounded px-2 py-1 text-sm"><option>第一次</option><option>第二次</option><option>第三次</option></select></div>
+                <div class="flex items-center gap-2"><label class="text-sm font-bold shrink-0">日期:</label><input type="date" id="inspectDate" class="w-full bg-white border rounded px-2 py-1 text-sm"></div>
+            </div>
+
+            <div class="flex items-center gap-4 mt-4">
+                <div class="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                    <div id="progressBar" class="progress-bar bg-blue-500 h-full rounded-full" style="width: 0%"></div>
+                </div>
+                <span id="percentText" class="text-sm font-bold text-blue-600 min-w-[40px]">0%</span>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-5xl mx-auto mt-64 px-4 space-y-6" id="main-content">
+        <!-- JS 動態渲染區域 -->
+    </main>
+
+    <script>
+        const checklistData = [
+            {
+                title: "1. 全戶",
+                items: [
+                    {id: "1.1", text: "水壓測量", link: "https://www.google.com/search?q=驗屋+水壓測量+標準"},
+                    {id: "1.2", text: "車位仗量", link: "https://www.google.com/search?q=驗屋+車位仗量+標準"},
+                    {id: "1.3", text: "圖面核對(給排水、回路圖、單線圖、照明設備等)", link: "https://www.google.com/search?q=驗屋+圖面核對(給排水、回路圖、單線圖、照明設備等)+標準"},
+                    {id: "1.4", text: "合約書核對(廚具、衛浴、建材等品牌型號)", link: "https://www.google.com/search?q=驗屋+合約書核對(廚具、衛浴、建材等品牌型號)+標準"},
+                    {id: "1.5", text: "電箱組裝外觀及功能(接地、絕緣電阻測量等)", link: "https://www.google.com/search?q=驗屋+電箱組裝外觀及功能(接地、絕緣電阻測量等)+標準"},
+                    {id: "1.6", text: "對講機外觀及功能測試", link: "https://www.google.com/search?q=驗屋+對講機外觀及功能測試+標準"},
+                    {id: "1.7", text: "其他", link: ""}
+                ]
+            },
+            {
+                title: "2. 客廳",
+                items: [
+                    {id: "2.1", text: "天花板漆面及泥作施工品質(空心)", link: "https://www.google.com/search?q=驗屋+天花板漆面及泥作施工品質(空心)+標準"},
+                    {id: "2.2", text: "天花板高度", link: "https://www.google.com/search?q=驗屋+天花板高度+標準"},
+                    {id: "2.3", text: "有無消防設備", link: "https://www.google.com/search?q=驗屋+有無消防設備+標準"},
+                    {id: "2.4", text: "穿樑(牆)套管位置", link: "https://www.google.com/search?q=驗屋+穿樑(牆)套管位置+標準"},
+                    {id: "2.5", text: "冷氣排水測試", link: "https://www.google.com/search?q=驗屋+冷氣排水測試+標準"},
+                    {id: "2.6", text: "地磚或木地板外觀(龜裂、刮痕、污損、填縫、收邊)", link: "https://www.google.com/search?q=驗屋+地磚或木地板外觀(龜裂、刮痕、污損、填縫、收邊)+標準"},
+                    {id: "2.7", text: "地磚空心、翹曲或木地板平整度", link: "https://www.google.com/search?q=驗屋+地磚空心、翹曲或木地板平整度+標準"},
+                    {id: "2.8", text: "門框、門片外觀及收邊", link: "https://www.google.com/search?q=驗屋+門框、門片外觀及收邊+標準"},
+                    {id: "2.9", text: "門擋、門弓器、門鎖、門把、鉸鏈等五金外觀及功能", link: "https://www.google.com/search?q=驗屋+門擋、門弓器、門鎖、門把、鉸鏈等五金外觀及功能+標準"},
+                    {id: "2.10", text: "測試門扇功能及密合度", link: "https://www.google.com/search?q=驗屋+測試門扇功能及密合度+標準"},
+                    {id: "2.11", text: "牆面漆面及泥作施工品質(空心、裂縫、吐鹼、色差、批土不平整)", link: "https://www.google.com/search?q=驗屋+牆面漆面及泥作施工品質(空心、裂縫、吐鹼、色差、批土不平整)+標準"},
+                    {id: "2.12", text: "牆面、窗框及窗角滲漏水測試(噴水、含水率)", link: "https://www.google.com/search?q=驗屋+牆面、窗框及窗角滲漏水測試(噴水、含水率)+標準"},
+                    {id: "2.13", text: "窗框、窗片、紗窗、玻璃外觀及矽膠收邊", link: "https://www.google.com/search?q=驗屋+窗框、窗片、紗窗、玻璃外觀及矽膠收邊+標準"},
+                    {id: "2.14", text: "測試窗戶功能及密合度", link: "https://www.google.com/search?q=驗屋+測試窗戶功能及密合度+標準"},
+                    {id: "2.15", text: "玻璃厚度測量", link: "https://www.google.com/search?q=驗屋+玻璃厚度測量+標準"},
+                    {id: "2.16", text: "插座接線、電壓、漏電斷路器測試", link: "https://www.google.com/search?q=驗屋+插座接線、電壓、漏電斷路器測試+標準"},
+                    {id: "2.17", text: "插座及開關數量、位置、功能測試", link: "https://www.google.com/search?q=驗屋+插座及開關數量、位置、功能測試+標準"},
+                    {id: "2.18", text: "電視、電話及網路插座功能測試", link: "https://www.google.com/search?q=驗屋+電視、電話及網路插座功能測試+標準"},
+                    {id: "2.19", text: "其他", link: ""}
+                ]
+            },
+            {
+                title: "3. 廚房",
+                items: [
+                    {id: "3.1", text: "天花板漆面及泥作施工品質(空心)", link: "https://www.google.com/search?q=驗屋+天花板漆面及泥作施工品質(空心)+標準"},
+                    {id: "3.2", text: "管道間及管線檢查", link: "https://www.google.com/search?q=驗屋+管道間及管線檢查+標準"},
+                    {id: "3.3", text: "牆面、地面瓷磚外觀(龜裂、刮痕、污損、色差、填縫)", link: "https://www.google.com/search?q=驗屋+牆面、地面瓷磚外觀+標準"},
+                    {id: "3.4", text: "牆面、地面瓷磚空心或翹曲", link: "https://www.google.com/search?q=驗屋+牆面、地面瓷磚空心或翹曲+標準"},
+                    {id: "3.5", text: "櫥櫃、檯面外觀(龜裂、刮痕、污損、收邊、門縫)", link: "https://www.google.com/search?q=驗屋+櫥櫃、檯面外觀+標準"},
+                    {id: "3.6", text: "抽油煙機、瓦斯爐、烘碗機外觀及功能測試", link: "https://www.google.com/search?q=驗屋+抽油煙機、瓦斯爐、烘碗機外觀及功能測試+標準"},
+                    {id: "3.7", text: "櫥櫃門片、五金外觀及功能測試", link: "https://www.google.com/search?q=驗屋+櫥櫃門片、五金外觀及功能測試+標準"},
+                    {id: "3.8", text: "水龍頭外觀與功能測試", link: "https://www.google.com/search?q=驗屋+水龍頭外觀與功能測試+標準"},
+                    {id: "3.9", text: "流理台溢水口、排水、漏水測試", link: "https://www.google.com/search?q=驗屋+流理台溢水口、排水、漏水測試+標準"},
+                    {id: "3.10", text: "流理台下方排水管、接縫、矽膠測試", link: "https://www.google.com/search?q=驗屋+流理台下方排水管、接縫、矽膠測試+標準"},
+                    {id: "3.11", text: "瓦斯偵測器外觀及功能測試", link: "https://www.google.com/search?q=驗屋+瓦斯偵測器外觀及功能測試+標準"},
+                    {id: "3.12", text: "瓦斯管線、接頭及凡而外觀檢查", link: "https://www.google.com/search?q=驗屋+瓦斯管線、接頭及凡而外觀檢查+標準"},
+                    {id: "3.13", text: "插座接線、電壓、漏電斷路器測試", link: "https://www.google.com/search?q=驗屋+插座接線、電壓、漏電斷路器測試+標準"},
+                    {id: "3.14", text: "冰箱、家電插座及開關數量、位置、功能測試", link: "https://www.google.com/search?q=驗屋+冰箱、家電插座及開關數量、位置、功能測試+標準"},
+                    {id: "3.15", text: "電氣專用迴路功能測試", link: "https://www.google.com/search?q=驗屋+電氣專用迴路功能測試+標準"},
+                    {id: "3.16", text: "門框、門片外觀、收邊、五金及功能", link: "https://www.google.com/search?q=驗屋+門框、門片外觀、收邊、五金及功能+標準"},
+                    {id: "3.17", text: "窗戶外觀、收邊、五金及功能測試", link: "https://www.google.com/search?q=驗屋+窗戶外觀、收邊、五金及功能測試+標準"},
+                    {id: "3.18", text: "牆面及窗角滲漏水測試(噴水、含水率)", link: "https://www.google.com/search?q=驗屋+牆面及窗角滲漏水測試(噴水、含水率)+標準"},
+                    {id: "3.19", text: "其他", link: ""}
+                ]
+            },
+            {
+                title: "4. 衛浴",
+                items: [
+                    {id: "4.1", text: "天花板及管道檢查(維修孔內天花、管路、排氣、止逆閥、封孔)", link: "https://www.google.com/search?q=驗屋+天花板及管道檢查+標準"},
+                    {id: "4.2", text: "有無消防設備", link: "https://www.google.com/search?q=驗屋+有無消防設備+標準"},
+                    {id: "4.3", text: "牆面瓷磚外觀(龜裂、刮痕、污損、色差、填縫)", link: "https://www.google.com/search?q=驗屋+牆面瓷磚外觀+標準"},
+                    {id: "4.4", text: "牆面瓷磚空心或翹曲", link: "https://www.google.com/search?q=驗屋+牆面瓷磚空心或翹曲+標準"},
+                    {id: "4.5", text: "地面瓷磚外觀(龜裂、刮痕、污損、色差、填縫)", link: "https://www.google.com/search?q=驗屋+地面瓷磚外觀+標準"},
+                    {id: "4.6", text: "地面瓷磚空心或翹曲", link: "https://www.google.com/search?q=驗屋+地面瓷磚空心或翹曲+標準"},
+                    {id: "4.7", text: "門框、門扇外觀及收邊", link: "https://www.google.com/search?q=驗屋+門框、門扇外觀及收邊+標準"},
+                    {id: "4.8", text: "門擋、門弓器、門鎖、門把、鉸鏈等五金外觀及功能", link: "https://www.google.com/search?q=驗屋+門擋、門弓器、門鎖、門把、鉸鏈等五金外觀及功能+標準"},
+                    {id: "4.9", text: "測試門扇功能及密合度", link: "https://www.google.com/search?q=驗屋+測試門扇功能及密合度+標準"},
+                    {id: "4.10", text: "門檻水平、外觀及收邊", link: "https://www.google.com/search?q=驗屋+門檻水平、外觀及收邊+標準"},
+                    {id: "4.11", text: "窗戶外觀、收邊、五金及功能測試", link: "https://www.google.com/search?q=驗屋+窗戶外觀、收邊、五金及功能測試+標準"},
+                    {id: "4.12", text: "牆面及窗角滲漏水測試(噴水、含水率)", link: "https://www.google.com/search?q=驗屋+牆面及窗角滲漏水測試(噴水、含水率)+標準"},
+                    {id: "4.13", text: "插座接線、電壓、漏電斷路器測試", link: "https://www.google.com/search?q=驗屋+插座接線、電壓、漏電斷路器測試+標準"},
+                    {id: "4.14", text: "暖風機專用迴路功能測試", link: "https://www.google.com/search?q=驗屋+暖風機專用迴路功能測試+標準"},
+                    {id: "4.15", text: "插座及開關數量、位置、功能測試", link: "https://www.google.com/search?q=驗屋+插座及開關數量、位置、功能測試+標準"},
+                    {id: "4.20", text: "其他五金配件外觀與功能測試(毛巾架、捲紙架等)", link: "https://www.google.com/search?q=驗屋+其他五金配件外觀與功能測試+標準"},
+                    {id: "4.21", text: "水龍頭外觀與功能測試(臉盆、淋浴、浴缸)", link: "https://www.google.com/search?q=驗屋+水龍頭外觀與功能測試+標準"},
+                    {id: "4.22", text: "洗臉盆排水、溢水口、排水管及接縫測試", link: "https://www.google.com/search?q=驗屋+洗臉盆排水、溢水口、排水管及接縫測試+標準"},
+                    {id: "4.23", text: "洗臉盆檯面、鏡浴櫃外觀及功能", link: "https://www.google.com/search?q=驗屋+洗臉盆檯面、鏡浴櫃外觀及功能+標準"},
+                    {id: "4.24", text: "浴缸外觀及穩定度", link: "https://www.google.com/search?q=驗屋+浴缸外觀及穩定度+標準"},
+                    {id: "4.25", text: "浴缸排水、溢水口、維修孔、排水管及接縫測試", link: "https://www.google.com/search?q=驗屋+浴缸排水、溢水口、維修孔、排水管及接縫測試+標準"},
+                    {id: "4.26", text: "馬桶外觀及穩定度(便座是否安裝及過電)", link: "https://www.google.com/search?q=驗屋+馬桶外觀及穩定度+標準"},
+                    {id: "4.27", text: "馬桶沖水功能測試", link: "https://www.google.com/search?q=驗屋+馬桶沖水功能測試+標準"},
+                    {id: "4.28", text: "淋浴區門片外觀、功能及噴水測試", link: "https://www.google.com/search?q=驗屋+淋浴區門片外觀、功能及噴水測試+標準"},
+                    {id: "4.29", text: "暖風機、抽風機外觀與功能測試", link: "https://www.google.com/search?q=驗屋+暖風機、抽風機外觀與功能測試+標準"},
+                    {id: "4.30", text: "衛浴門檻滲漏水測試(淹水)", link: "https://www.google.com/search?q=驗屋+衛浴門檻滲漏水測試(淹水)+標準"},
+                    {id: "4.31", text: "洩水坡度測試", link: "https://www.google.com/search?q=驗屋+洩水坡度測試+標準"},
+                    {id: "4.32", text: "其他", link: ""}
+                ]
+            },
+            {
+                title: "5. 陽台",
+                items: [
+                    {id: "5.1", text: "穿樑(牆)套管位置", link: "https://www.google.com/search?q=驗屋+穿樑(牆)套管位置+標準"},
+                    {id: "5.2", text: "管道間及管線檢查", link: "https://www.google.com/search?q=驗屋+管道間及管線檢查+標準"},
+                    {id: "5.3", text: "維修孔蓋與天花板外觀及功能", link: "https://www.google.com/search?q=驗屋+維修孔蓋與天花板外觀及功能+標準"},
+                    {id: "5.4", text: "冷氣排水測試", link: "https://www.google.com/search?q=驗屋+冷氣排水測試+標準"},
+                    {id: "5.5", text: "地面排水管道測試及內視鏡檢查", link: "https://www.google.com/search?q=驗屋+地面排水管道測試及內視鏡檢查+標準"},
+                    {id: "5.6", text: "地磚外觀(龜裂、刮痕、污損、填縫、收邊)", link: "https://www.google.com/search?q=驗屋+地磚外觀+標準"},
+                    {id: "5.7", text: "地磚空心、翹曲或木地板平整度", link: "https://www.google.com/search?q=驗屋+地磚空心、翹曲或木地板平整度+標準"},
+                    {id: "5.8", text: "牆面外觀及泥作施工品質(空心)", link: "https://www.google.com/search?q=驗屋+牆面外觀及泥作施工品質(空心)+標準"},
+                    {id: "5.9", text: "欄杆外觀及穩定度", link: "https://www.google.com/search?q=驗屋+欄杆外觀及穩定度+標準"},
+                    {id: "5.10", text: "門框、門片外觀、收邊、五金及功能", link: "https://www.google.com/search?q=驗屋+門框、門片外觀、收邊、五金及功能+標準"},
+                    {id: "5.11", text: "牆面及窗角滲漏水測試(噴水、含水率)", link: "https://www.google.com/search?q=驗屋+牆面及窗角滲漏水測試(噴水、含水率)+標準"},
+                    {id: "5.12", text: "插座、龍頭及工作燈數量、位置、功能", link: "https://www.google.com/search?q=驗屋+插座、龍頭及工作燈數量、位置、功能+標準"},
+                    {id: "5.13", text: "洩水坡度測試", link: "https://www.google.com/search?q=驗屋+洩水坡度測試+標準"},
+                    {id: "5.14", text: "曬衣架、洗滌槽外觀及功能", link: "https://www.google.com/search?q=驗屋+曬衣架、洗滌槽外觀及功能+標準"},
+                    {id: "5.15", text: "其他", link: ""}
+                ]
+            },
+            {
+                title: "6. 臥室",
+                items: [
+                    {id: "6.1", text: "天花板漆面及泥作施工品質(空心)", link: "https://www.google.com/search?q=驗屋+天花板漆面及泥作施工品質(空心)+標準"},
+                    {id: "6.2", text: "天花板高度", link: "https://www.google.com/search?q=驗屋+天花板高度+標準"},
+                    {id: "6.3", text: "有無消防設備", link: "https://www.google.com/search?q=驗屋+有無消防設備+標準"},
+                    {id: "6.4", text: "穿樑(牆)套管位置", link: "https://www.google.com/search?q=驗屋+穿樑(牆)套管位置+標準"},
+                    {id: "6.5", text: "冷氣排水測試", link: "https://www.google.com/search?q=驗屋+冷氣排水測試+標準"},
+                    {id: "6.6", text: "地磚或木地板外觀(龜裂、刮痕、污損、填縫、收邊)", link: "https://www.google.com/search?q=驗屋+地磚或木地板外觀(龜裂、刮痕、污損、填縫、收邊)+標準"},
+                    {id: "6.7", text: "地磚空心、翹曲或木地板平整度", link: "https://www.google.com/search?q=驗屋+地磚空心、翹曲或木地板平整度+標準"},
+                    {id: "6.8", text: "門框、門片外觀及收邊", link: "https://www.google.com/search?q=驗屋+門框、門片外觀及收邊+標準"},
+                    {id: "6.9", text: "門擋、門弓器、門鎖、門把、鉸鏈等五金外觀及功能", link: "https://www.google.com/search?q=驗屋+門擋、門弓器、門鎖、門把、鉸鏈等五金外觀及功能+標準"},
+                    {id: "6.10", text: "測試門扇功能及密合度", link: "https://www.google.com/search?q=驗屋+測試門扇功能及密合度+標準"},
+                    {id: "6.11", text: "門檻水平、外觀及收邊", link: "https://www.google.com/search?q=驗屋+門檻水平、外觀及收邊+標準"},
+                    {id: "6.12", text: "窗框及窗角噴水測試", link: "https://www.google.com/search?q=驗屋+窗框及窗角噴水測試+標準"},
+                    {id: "6.13", text: "窗框、窗片、紗窗、玻璃外觀及矽膠收邊", link: "https://www.google.com/search?q=驗屋+窗框、窗片、紗窗、玻璃外觀及矽膠收邊+標準"},
+                    {id: "6.14", text: "測試窗戶功能及密合度", link: "https://www.google.com/search?q=驗屋+測試窗戶功能及密合度+標準"},
+                    {id: "6.15", text: "玻璃厚度測量", link: "https://www.google.com/search?q=驗屋+玻璃厚度測量+標準"},
+                    {id: "6.16", text: "插座接線、電壓、漏電斷路器測試", link: "https://www.google.com/search?q=驗屋+插座接線、電壓、漏電斷路器測試+標準"},
+                    {id: "6.17", text: "插座及開關數量、位置、功能測試", link: "https://www.google.com/search?q=驗屋+插座及開關數量、位置、功能測試+標準"},
+                    {id: "6.18", text: "其他", link: ""}
+                ]
+            }
+        ];
+
+        function renderAllSections() {
+            const main = document.getElementById('main-content');
+            main.innerHTML = ''; 
+            checklistData.forEach((section, index) => {
+                const sectionId = index + 1;
+                const sectionEl = document.createElement('section');
+                sectionEl.id = `sec-container-${sectionId}`;
+                sectionEl.className = "mb-6 relative";
+                
+                sectionEl.innerHTML = `
+                    <div class="absolute right-12 top-4 z-20 flex items-center gap-2">
+                        <button type="button" 
+                            onclick="resetSection(${sectionId})" 
+                            class="section-reset-btn text-[11px] bg-red-50 border border-red-200 text-red-600 px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-all font-bold shadow-sm">
+                            清除此區
+                        </button>
+                    </div>
+                    <details class="group bg-white rounded-xl shadow-md overflow-hidden border border-slate-200" ${sectionId === 1 ? 'open' : ''}>
+                        <summary class="flex justify-between items-center p-5 cursor-pointer bg-slate-100 hover:bg-slate-200 transition-colors list-none">
+                            <div class="flex items-center gap-4">
+                                <span class="text-lg font-bold text-slate-700">
+                                    ${section.title} 
+                                    <span class="ml-4 text-sm font-normal text-slate-500">
+                                        (合格: <span id="pass-count-${sectionId}">0</span> 缺失: <span id="fail-count-${sectionId}">0</span>)
+                                    </span>
+                                </span>
+                            </div>
+                            <span class="category-count text-xs font-bold bg-white text-blue-600 px-3 py-1 rounded-full border shadow-sm mr-24">
+                                0 / ${section.items.length}
+                            </span>
+                        </summary>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <tbody class="divide-y divide-slate-100" id="group-${sectionId}">
+                                    ${section.items.map(item => `
+                                        <tr class="item-row hover:bg-slate-50 transition-colors border-b border-slate-100">
+                                            <td class="p-4 text-sm text-slate-700 font-medium leading-relaxed">
+                                                <span class="mr-2 text-slate-400 font-mono">${item.id}</span>
+                                                ${item.link ? `<a href="${item.link}" target="_blank" class="item-link">${item.text}</a>` : item.text}
+                                            </td>
+                                            <td class="p-4 text-center">
+                                                <div class="flex gap-2 justify-center">
+                                                    <button type="button" onclick="setStatus(this, 'pass')" class="status-btn pass-btn border border-slate-200 px-3 py-1.5 rounded-lg text-xs transition-all font-bold">合格</button>
+                                                    <button type="button" onclick="setStatus(this, 'fail')" class="status-btn fail-btn border border-slate-200 px-3 py-1.5 rounded-lg text-xs transition-all font-bold">缺失</button>
+                                                </div>
+                                            </td>
+                                            <td class="p-4">
+                                                <textarea placeholder="缺失說明及位置..." class="w-full border border-slate-200 rounded-lg p-2 text-xs h-10 resize-none focus:border-blue-400 outline-none"></textarea>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                `;
+                main.appendChild(sectionEl);
+            });
+        }
+
+        function setStatus(btn, status) {
+            const row = btn.closest('.item-row');
+            const buttons = row.querySelectorAll('.status-btn');
+            buttons.forEach(b => b.classList.remove('active-pass', 'active-fail'));
+            
+            if (status === 'pass') {
+                btn.classList.add('active-pass');
+                row.setAttribute('data-result', '合格');
+                row.classList.remove('row-fail');
+            } else {
+                btn.classList.add('active-fail');
+                row.setAttribute('data-result', '缺失');
+                row.classList.add('row-fail');
+            }
+            updateProgress();
+        }
+
+        function resetSection(sectionId) {
+            const title = checklistData[sectionId - 1].title;
+            if(!confirm(`確定要清除「${title}」的所有輸入紀錄嗎？`)) return;
+            
+            const group = document.getElementById(`group-${sectionId}`);
+            if (!group) return;
+
+            const rows = group.querySelectorAll('.item-row');
+            rows.forEach(row => {
+                row.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active-pass', 'active-fail'));
+                row.removeAttribute('data-result');
+                row.classList.remove('row-fail');
+                const area = row.querySelector('textarea');
+                if (area) area.value = '';
+            });
+
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const allRows = document.querySelectorAll('.item-row');
+            const completedRows = document.querySelectorAll('.item-row[data-result]');
+            const percent = (completedRows.length / allRows.length) * 100 || 0;
+            
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('percentText').innerText = Math.round(percent) + '%';
+
+            checklistData.forEach((_, index) => {
+                const sId = index + 1;
+                const group = document.getElementById(`group-${sId}`);
+                if (!group) return;
+                
+                const passes = group.querySelectorAll('.item-row[data-result="合格"]').length;
+                const fails = group.querySelectorAll('.item-row[data-result="缺失"]').length;
+                const total = group.querySelectorAll('.item-row').length;
+                
+                document.getElementById(`pass-count-${sId}`).innerText = passes;
+                document.getElementById(`fail-count-${sId}`).innerText = fails;
+                
+                const section = group.closest('section');
+                const badge = section.querySelector('.category-count');
+                if (badge) badge.innerText = `${passes + fails} / ${total}`;
+            });
+        }
+
+        function sendEmail() {
+            const houseId = document.getElementById('houseId').value || "未填寫";
+            let body = `驗屋報告 - ${houseId}\r\n`;
+            document.querySelectorAll('.item-row[data-result]').forEach(row => {
+                const id = row.querySelector('.font-mono').innerText;
+                const text = row.querySelector('td').innerText.split('\n')[0].replace(id, '').trim();
+                const result = row.getAttribute('data-result');
+                const note = row.querySelector('textarea').value;
+                body += `${id} ${text}: [${result}] ${note ? '('+note+')' : ''}\r\n`;
+            });
+            window.location.href = `mailto:cosa1023@gmail.com?subject=報告_${houseId}&body=${encodeURIComponent(body)}`;
+        }
+
+        function resetAll() {
+            if(confirm('確定要全部清空並重新開始嗎？')) location.reload();
+        }
+
+        window.onload = function() {
+            document.getElementById('inspectDate').valueAsDate = new Date();
+            renderAllSections();
+            updateProgress();
+        };
+    </script>
+</body>
+</html>
